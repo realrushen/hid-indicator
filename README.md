@@ -4,13 +4,13 @@ This program displays the buttons on the XK-24 keyboard in the graphical
 interface and highlights the keyboard buttons in red or blue at the user's
 command.
 
-## Dependencies
+## Dependencies:
 
 1. Python 3.9
 2. hidapi 0.13.1
 3. PyQt5 5.15.9
 
-## Installation
+## Installation:
 
 1. Clone repository `` git clone https://github.com/realrushen/hid-indicator``
 2. Create Python Virtual Environment ``python -m venv venv``
