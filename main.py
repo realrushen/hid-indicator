@@ -33,7 +33,7 @@ class Button(QPushButton):
         self.init_ui()
 
     def init_ui(self):
-        self.setFixedSize(QSize(40, 40))  # button size
+        self.setFixedSize(QSize(40, 40))
         self.setText(str(self.index))
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
@@ -53,18 +53,20 @@ class Button(QPushButton):
 
     @pyqtSlot(str)
     def set_color(self, color):
-        message: bytearray = MESSAGES[color]
+        message = MESSAGES[color]
         message[2] += self.index
+        logger.debug('backlight_change signal emitted')
         self.backlight_change.emit(message)
 
 
-# Define main window class
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.buttons = [Button(index, parent=self) for index in BUTTON_IDS]
 
         self.device = None
+        self.open_device_timer = None
+        self.receive_report_timer = None
 
         self.setup_ui()
         self.setup_timers()
@@ -93,22 +95,34 @@ class MainWindow(QMainWindow):
         for button, state in zip(self.buttons, button_states):
             button_pressed = (state != 0)
 
-            if button_pressed:  # simulate button press
+            if button_pressed:
                 button.setDown(True)
             else:
                 button.setDown(False)
 
     def receive_report(self):
-        button_states = read_xkeys(self.device)
-        if button_states:
-            self.update_buttons(button_states)
+        """
+        Если устройство проинициализировано, пытаемся получить
+        данные о нажатых клавишах. Если хотя бы одна клавиша нажата,
+        обновляем графический интерфейс. Если устройство не
+        проинициализировано, перестаем считывать данные и пытаемся
+        его проинициализировать.
+        """
+        if self.device:
+            button_states = read_xkeys(self.device)
+            if button_states:
+                self.update_buttons(button_states)
+        else:
+            self.receive_report_timer.stop()
+            self.open_device_timer.start()
 
     def send_report(self, message: List[int]):
         if device_connected():
             try:
+                logger.debug('sending report with message: %s', message)
                 self.device.write(message)
             except IOError as ex:
-                print(ex)
+                logger.error('failed to send report, %s', ex)
 
     def clean_up(self):
         if device_connected():
@@ -116,7 +130,13 @@ class MainWindow(QMainWindow):
             self.device = None
 
     def open_device(self):
-        logger.info('serching for device')
+        """
+        Провереяем подключено ли устройство. Если подключено,
+        пытаемся открыть его. Если получилось, останавливаем таймер
+        открытия устройства и включаем таймер получения информации о
+        нажатых клавишах.
+        """
+        logger.info('searching for device')
         if device_connected():
             device = open_xkeys()
             if device:
